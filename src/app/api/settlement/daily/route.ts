@@ -32,18 +32,18 @@ export async function GET(request: NextRequest) {
     const totalPurchases = purchases.reduce((s, t) => s + t.totalAmount, 0)
 
     // === 2. 공헌이익 계산 (전체) ===
-    // 공헌이익 = 매출 - 변동비(매출원가 = 제품 매입가 × 수량)
-    let totalVariableCost = 0
+    // 변동비 = 매출원가(매입단가 × 수량) + 당일 비용(EXPENSE) + 당일 매입(PURCHASE)
+    let totalCOGS = 0  // 매출원가 (제품 매입가 × 판매수량)
     const productContributions: Record<string, {
       productId: string; productName: string; category: string
-      revenue: number; variableCost: number; quantity: number; unit: string
+      revenue: number; cogs: number; quantity: number; unit: string
     }> = {}
 
     sales.forEach(tx => {
       tx.items.forEach(item => {
         const purchasePrice = item.product?.purchasePrice || 0
-        const variableCost = purchasePrice * item.quantity
-        totalVariableCost += variableCost
+        const cogs = purchasePrice * item.quantity
+        totalCOGS += cogs
 
         const key = item.productId || item.productName || 'etc'
         if (!productContributions[key]) {
@@ -51,25 +51,41 @@ export async function GET(request: NextRequest) {
             productId: key,
             productName: item.product?.name || item.productName || '기타',
             category: item.product?.category || '',
-            revenue: 0, variableCost: 0, quantity: 0,
+            revenue: 0, cogs: 0, quantity: 0,
             unit: item.product?.unit || 'PIECE',
           }
         }
         productContributions[key].revenue += item.amount
-        productContributions[key].variableCost += variableCost
+        productContributions[key].cogs += cogs
         productContributions[key].quantity += item.quantity
       })
     })
 
+    // 변동비 합계 = 매출원가 + 비용 + 매입
+    const totalVariableCost = totalCOGS + totalExpenses + totalPurchases
     const totalContributionMargin = totalSales - totalVariableCost
     const contributionMarginRate = totalSales > 0 ? (totalContributionMargin / totalSales) * 100 : 0
+
+    // 비용 상세 내역
+    const expenseDetails = expenses.map(tx => ({
+      description: tx.description || tx.items[0]?.productName || '비용',
+      amount: tx.totalAmount,
+      clientName: tx.client?.name || null,
+    }))
+
+    // 매입 상세 내역
+    const purchaseDetails = purchases.map(tx => ({
+      description: tx.items.map(i => i.product?.name || i.productName).filter(Boolean).join(', ') || '매입',
+      amount: tx.totalAmount,
+      clientName: tx.client?.name || null,
+    }))
 
     // 제품별 공헌이익 배열 (정렬: 공헌이익 높은 순)
     const productCM = Object.values(productContributions)
       .map(p => ({
         ...p,
-        contributionMargin: p.revenue - p.variableCost,
-        contributionMarginRate: p.revenue > 0 ? ((p.revenue - p.variableCost) / p.revenue) * 100 : 0,
+        contributionMargin: p.revenue - p.cogs,
+        contributionMarginRate: p.revenue > 0 ? ((p.revenue - p.cogs) / p.revenue) * 100 : 0,
       }))
       .sort((a, b) => b.contributionMargin - a.contributionMargin)
 
@@ -167,8 +183,16 @@ export async function GET(request: NextRequest) {
 
       // 공헌이익 (전체)
       totalVariableCost,
+      totalCOGS,          // 매출원가 (제품 매입가 × 판매수량)
       totalContributionMargin,
       contributionMarginRate,
+
+      // 변동비 상세 (매출원가 / 비용 / 매입 구분)
+      variableCostBreakdown: {
+        cogs: { label: '매출원가 (제품원가×수량)', amount: totalCOGS },
+        expenses: { label: '비용 (당일 지출)', amount: totalExpenses, details: expenseDetails },
+        purchases: { label: '원자재 매입', amount: totalPurchases, details: purchaseDetails },
+      },
 
       // 제품별 공헌이익
       productCM,

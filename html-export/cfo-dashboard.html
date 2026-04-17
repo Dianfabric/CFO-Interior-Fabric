@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFO - 인테리어 원단 경영관리</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .sidebar-item.active { background: #2563eb; color: white; box-shadow: 0 4px 14px rgba(37,99,235,0.3); }
+  .sidebar-item:hover:not(.active) { background: #1e293b; color: white; }
+  .kpi-card { transition: transform 0.2s; }
+  .kpi-card:hover { transform: translateY(-2px); }
+  .bep-bar { position: relative; overflow: hidden; }
+  .bep-line { position: absolute; left: 50%; top: 0; height: 100%; width: 2px; background: #1e293b; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen flex">
+
+<!-- 사이드바 -->
+<aside id="sidebar" class="w-60 bg-slate-900 text-white flex flex-col h-screen sticky top-0 shrink-0">
+  <div class="flex items-center gap-2 p-4 border-b border-slate-700">
+    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+    <span class="font-bold text-lg">CFO</span>
+  </div>
+  <nav class="flex-1 py-4 px-2 space-y-1">
+    <a onclick="showPage('dashboard')" class="sidebar-item active flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium" data-page="dashboard">📊 대시보드</a>
+    <a onclick="showPage('settlement')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="settlement">📅 일일 결산</a>
+    <a onclick="showPage('transactions')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="transactions">🧾 거래 관리</a>
+    <a onclick="showPage('clients')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="clients">👥 거래처 관리</a>
+    <a onclick="showPage('receivables')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="receivables">⚠️ 미수금 관리</a>
+    <a onclick="showPage('products')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="products">📦 제품 관리</a>
+    <a onclick="showPage('costs')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="costs">💰 비용 관리</a>
+    <a onclick="showPage('analysis')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="analysis">📈 분석/시뮬레이션</a>
+    <a onclick="showPage('advisor')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="advisor">🤖 AI CFO 자문</a>
+    <a onclick="showPage('settings')" class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium text-slate-300" data-page="settings">⚙️ 설정</a>
+  </nav>
+  <div class="p-4 border-t border-slate-700"><p class="text-xs text-slate-400 text-center">인테리어 원단 CFO v1.0</p></div>
+</aside>
+
+<!-- 메인 콘텐츠 -->
+<div class="flex-1 flex flex-col min-h-screen">
+  <!-- 헤더 -->
+  <header class="h-14 border-b bg-white flex items-center justify-between px-6 sticky top-0 z-10">
+    <h2 class="text-sm text-slate-500" id="headerDate"></h2>
+    <div class="flex items-center gap-2">
+      <button class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">+ 새 거래</button>
+      <button class="p-2 rounded hover:bg-slate-100">🔔</button>
+    </div>
+  </header>
+  <main class="flex-1 p-6">
+
+<!-- ===================== 대시보드 ===================== -->
+<div id="page-dashboard" class="page active space-y-6">
+  <div class="flex items-center justify-between">
+    <div><h1 class="text-2xl font-bold text-slate-900">경영 대시보드</h1><p class="text-sm text-slate-500">실시간 경영 현황을 한눈에 확인하세요</p></div>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-blue-500 p-4 shadow-sm"><p class="text-xs text-slate-500">오늘 매출</p><p class="text-xl font-bold">₩5,650,000</p><p class="text-xs text-slate-400">3건</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-green-500 p-4 shadow-sm"><p class="text-xs text-slate-500">이번 달 매출</p><p class="text-xl font-bold">₩35,830,000</p><p class="text-xs text-green-600 mt-1">📈 전월 대비 -56.4%</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-yellow-500 p-4 shadow-sm"><p class="text-xs text-slate-500">이번 달 순이익</p><p class="text-xl font-bold">₩31,933,401</p><p class="text-xs text-slate-400">이익률 89.1%</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-red-500 p-4 shadow-sm"><p class="text-xs text-slate-500">미수금 총액</p><p class="text-xl font-bold text-red-600">₩26,605,000</p></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="font-semibold text-sm mb-3">최근 7일 매출 추이</h3><canvas id="salesChart" height="200"></canvas></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="font-semibold text-sm mb-3">제품별 매출</h3><canvas id="productChart" height="200"></canvas></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="font-semibold text-sm mb-3">미수금 경과 분석</h3><canvas id="arChart" height="180"></canvas></div>
+    <div class="bg-blue-50 rounded-xl border border-blue-200 p-4"><h3 class="font-semibold text-sm mb-2 flex items-center gap-2">🤖 AI CFO 인사이트</h3><p class="text-sm text-slate-600">⚠️ 미수금이 월 매출의 74%에 달합니다. 현금흐름 관리에 주의가 필요합니다. AI CFO 자문 메뉴에서 상세 분석을 받아보세요.</p></div>
+  </div>
+  <div class="bg-white rounded-xl border p-4 shadow-sm">
+    <h3 class="font-semibold text-sm mb-3">최근 거래 내역</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="border-b text-left text-slate-500"><th class="pb-2">날짜</th><th class="pb-2">구분</th><th class="pb-2">거래처</th><th class="pb-2 text-right">금액</th><th class="pb-2">결제</th><th class="pb-2">상태</th></tr></thead>
+      <tbody>
+        <tr class="border-b hover:bg-slate-50"><td class="py-2">2026.04.13</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>(주)하나인테리어</td><td class="text-right font-medium">₩4,500,000</td><td>계좌이체</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="py-2">2026.04.13</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>그린홈 커튼</td><td class="text-right font-medium">₩850,000</td><td>외상</td><td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs">미결제</span></td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="py-2">2026.04.13</td><td><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">비용</span></td><td>-</td><td class="text-right font-medium">₩152,537</td><td>계좌이체</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="py-2">2026.04.12</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>럭셔리리빙</td><td class="text-right font-medium">₩1,500,000</td><td>카드</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td></tr>
+        <tr class="hover:bg-slate-50"><td class="py-2">2026.04.12</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>소파킹 가구</td><td class="text-right font-medium">₩900,000</td><td>외상</td><td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs">미결제</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===================== 일일 결산 ===================== -->
+<div id="page-settlement" class="page space-y-6">
+  <div class="flex items-center justify-between">
+    <div><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">📅 일일 결산</h1><p class="text-sm text-slate-500">공헌이익 기반 일일 경영 성과 분석</p></div>
+    <div class="flex items-center gap-2"><button class="border rounded px-2 py-1">◀</button><input type="date" value="2026-04-13" class="border rounded px-3 py-1 text-sm"><button class="border rounded px-2 py-1">▶</button><button class="border rounded px-3 py-1 text-sm">오늘</button></div>
+  </div>
+  <p class="text-lg font-semibold text-slate-700">2026년 04월 13일 결산</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-blue-500 p-4 shadow-sm"><p class="text-xs text-slate-500">일 매출</p><p class="text-xl font-bold">₩5,650,000</p><p class="text-xs text-green-600 mt-1">📈 전일 대비 +135.4%</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-green-500 p-4 shadow-sm"><p class="text-xs text-slate-500">공헌이익</p><p class="text-xl font-bold text-green-700">₩3,000,000</p><p class="text-xs text-slate-400">공헌이익률 53.1%</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-purple-500 p-4 shadow-sm"><p class="text-xs text-slate-500">영업이익 (고정비 차감)</p><p class="text-xl font-bold text-green-700">₩2,422,727</p><p class="text-xs text-slate-400">일일 고정비 ₩577,273</p></div>
+    <div class="kpi-card bg-white rounded-xl border border-l-4 border-l-green-500 p-4 shadow-sm"><p class="text-xs text-slate-500">🎯 일일 BEP 달성률</p><p class="text-xl font-bold text-green-600">519.7%</p><p class="text-xs text-slate-400">월 누적 146.7%</p></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border p-4 shadow-sm">
+      <h3 class="font-semibold text-sm mb-3">공헌이익 구조 (일일)</h3>
+      <canvas id="waterfallChart" height="180"></canvas>
+      <div class="mt-3 p-3 bg-slate-50 rounded-lg text-sm space-y-1">
+        <div class="flex justify-between"><span>매출</span><span class="font-medium">₩5,650,000</span></div>
+        <div class="flex justify-between text-red-600"><span>(-) 변동비 (매출원가)</span><span>₩2,650,000</span></div>
+        <div class="flex justify-between font-bold text-green-700 border-t pt-1"><span>= 공헌이익</span><span>₩3,000,000</span></div>
+        <div class="flex justify-between text-yellow-600"><span>(-) 일일 고정비 배분</span><span>₩577,273</span></div>
+        <div class="flex justify-between font-bold border-t pt-1"><span>= 영업이익</span><span class="text-green-700">₩2,422,727</span></div>
+      </div>
+    </div>
+    <div class="bg-green-50 rounded-xl border border-green-200 p-4">
+      <h3 class="font-semibold text-sm mb-4 flex items-center gap-2">🎯 손익분기(BEP) 달성 현황</h3>
+      <div class="mb-4">
+        <p class="text-sm font-semibold mb-2">오늘의 BEP</p>
+        <div class="w-full bg-white/60 rounded-full h-7 bep-bar"><div class="h-full rounded-full bg-green-500" style="width:100%"></div><div class="bep-line"></div><span class="absolute inset-0 flex items-center justify-center text-xs font-bold">519.7%</span></div>
+        <div class="flex justify-between text-xs text-slate-500 mt-1"><span>공헌이익: ₩3,000,000</span><span>일일 고정비: ₩577,273</span></div>
+      </div>
+      <div class="mb-4">
+        <p class="text-sm font-semibold mb-2">이번 달 누적 BEP</p>
+        <div class="w-full bg-white/60 rounded-full h-7 bep-bar"><div class="h-full rounded-full bg-green-500" style="width:100%"></div><div class="bep-line"></div><span class="absolute inset-0 flex items-center justify-center text-xs font-bold">146.7%</span></div>
+        <div class="flex justify-between text-xs text-slate-500 mt-1"><span>누적 공헌이익: ₩18,628,000</span><span>월 고정비: ₩12,700,000</span></div>
+      </div>
+      <div class="pt-3 border-t border-green-200">
+        <p class="text-xs font-semibold mb-2 text-slate-600">고정비 내역 (일일 배분)</p>
+        <div class="space-y-1 text-xs">
+          <div class="flex justify-between"><span>공장 월 임대료</span><span>₩90,909/일</span></div>
+          <div class="flex justify-between"><span>사무실 월 임대료</span><span>₩36,364/일</span></div>
+          <div class="flex justify-between"><span>직원 급여 (3명)</span><span>₩409,091/일</span></div>
+          <div class="flex justify-between"><span>택배 계약비</span><span>₩22,727/일</span></div>
+          <div class="flex justify-between"><span>전기/수도/가스</span><span>₩13,636/일</span></div>
+          <div class="flex justify-between"><span>인터넷/전화</span><span>₩4,545/일</span></div>
+          <div class="flex justify-between font-bold border-t pt-1"><span>합계</span><span>₩577,273/일</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 제품별 공헌이익 -->
+  <div class="bg-white rounded-xl border p-4 shadow-sm">
+    <h3 class="font-semibold text-sm mb-3">제품별 공헌이익 분석</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="border-b text-left text-slate-500 bg-slate-50"><th class="p-2">제품명</th><th class="p-2">카테고리</th><th class="p-2 text-right">수량</th><th class="p-2 text-right">매출</th><th class="p-2 text-right">변동비</th><th class="p-2 text-right">공헌이익</th><th class="p-2 text-right">공헌이익률</th></tr></thead>
+      <tbody>
+        <tr class="border-b"><td class="p-2 font-medium">3인 소파 (프리미엄)</td><td class="p-2"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파(완제품)</span></td><td class="p-2 text-right">3개</td><td class="p-2 text-right">₩4,500,000</td><td class="p-2 text-right text-red-600">₩2,100,000</td><td class="p-2 text-right font-bold text-green-700">₩2,400,000</td><td class="p-2 text-right text-green-600 font-bold">53.3%</td></tr>
+        <tr class="border-b"><td class="p-2 font-medium">2인 소파 (기본)</td><td class="p-2"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파(완제품)</span></td><td class="p-2 text-right">1개</td><td class="p-2 text-right">₩850,000</td><td class="p-2 text-right text-red-600">₩400,000</td><td class="p-2 text-right font-bold text-green-700">₩450,000</td><td class="p-2 text-right text-green-600 font-bold">52.9%</td></tr>
+        <tr class="border-b"><td class="p-2 font-medium">린넨 커튼원단</td><td class="p-2"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">커튼원단</span></td><td class="p-2 text-right">15미터</td><td class="p-2 text-right">₩300,000</td><td class="p-2 text-right text-red-600">₩150,000</td><td class="p-2 text-right font-bold text-green-700">₩150,000</td><td class="p-2 text-right text-green-600 font-bold">50.0%</td></tr>
+        <tr class="bg-slate-50 font-bold"><td class="p-2" colspan="3">합계</td><td class="p-2 text-right">₩5,650,000</td><td class="p-2 text-right text-red-600">₩2,650,000</td><td class="p-2 text-right text-green-700">₩3,000,000</td><td class="p-2 text-right">53.1%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- 현금흐름 + 미수금 + 비교 -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="text-sm font-semibold mb-2">💵 현금흐름</h3><div class="space-y-2 text-sm"><div class="flex justify-between"><span>입금 (현금 매출)</span><span class="font-bold text-green-600">+₩4,800,000</span></div><div class="flex justify-between"><span>출금 (비용+매입)</span><span class="font-bold text-red-600">-₩1,352,537</span></div><div class="flex justify-between font-bold border-t pt-2"><span>순현금흐름</span><span class="text-green-700">₩3,447,463</span></div></div></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="text-sm font-semibold mb-2">⚠️ 오늘 발생 미수금</h3><div class="space-y-1 text-sm"><div class="flex justify-between"><span>그린홈 커튼</span><span class="text-red-600">₩342,000</span></div><div class="flex justify-between"><span>(주)하나인테리어</span><span class="text-red-600">₩1,700,000</span></div><div class="flex justify-between font-bold border-t pt-1"><span>합계</span><span class="text-red-600">₩2,042,000</span></div></div></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><h3 class="text-sm font-semibold mb-2">전일/전주 비교</h3><div class="space-y-2"><p class="text-xs text-slate-400">vs 전일</p><p class="text-sm">📈 매출 +135.4%</p><p class="text-sm">📈 공헌이익 +142.0%</p><p class="text-xs text-slate-400 mt-2">vs 전주 동요일</p><p class="text-sm">📈 매출 +89.2%</p></div></div>
+  </div>
+</div>
+
+<!-- ===================== 거래 관리 ===================== -->
+<div id="page-transactions" class="page space-y-6">
+  <div class="flex items-center justify-between">
+    <div><h1 class="text-2xl font-bold text-slate-900">거래 관리</h1><p class="text-sm text-slate-500">매출·비용·매입 거래를 기록하고 조회합니다</p></div>
+    <div class="flex gap-2"><button class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm">+ 매출</button><button class="border px-3 py-1.5 rounded-lg text-sm">+ 비용</button><button class="border px-3 py-1.5 rounded-lg text-sm">+ 매입</button></div>
+  </div>
+  <div class="flex gap-3"><select class="border rounded px-3 py-1.5 text-sm"><option>전체 구분</option><option>매출</option><option>비용</option><option>매입</option></select><input type="date" class="border rounded px-3 py-1.5 text-sm"><span class="text-sm text-slate-500 flex items-center">총 126건</span></div>
+  <div class="bg-white rounded-xl border shadow-sm">
+    <table class="w-full text-sm">
+      <thead><tr class="border-b text-left text-slate-500 bg-slate-50"><th class="p-3">날짜</th><th class="p-3">구분</th><th class="p-3">거래처</th><th class="p-3">상세</th><th class="p-3 text-right">금액</th><th class="p-3">결제</th><th class="p-3">상태</th><th class="p-3">채널</th></tr></thead>
+      <tbody>
+        <tr class="border-b hover:bg-slate-50"><td class="p-3">2026.04.13</td><td><span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs">매입</span></td><td>텍스타일코리아</td><td class="text-slate-600">암막 커튼원단</td><td class="p-3 text-right font-medium">₩1,200,000</td><td>계좌이체</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td><td class="text-xs text-slate-500">B2B</td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="p-3">2026.04.13</td><td><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs">비용</span></td><td>-</td><td class="text-slate-600">사무용품 구매</td><td class="p-3 text-right font-medium">₩152,537</td><td>계좌이체</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td><td class="text-xs text-slate-500">B2B</td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="p-3">2026.04.13</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>(주)하나인테리어</td><td class="text-slate-600">3인 소파 (프리미엄)</td><td class="p-3 text-right font-medium">₩4,500,000</td><td>외상</td><td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs">미결제</span></td><td class="text-xs text-slate-500">B2B</td></tr>
+        <tr class="border-b hover:bg-slate-50"><td class="p-3">2026.04.13</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>그린홈 커튼</td><td class="text-slate-600">2인 소파 (기본)</td><td class="p-3 text-right font-medium">₩850,000</td><td>카드</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td><td class="text-xs text-slate-500">B2C 오프라인</td></tr>
+        <tr class="hover:bg-slate-50"><td class="p-3">2026.04.12</td><td><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">매출</span></td><td>예쁜집 인테리어</td><td class="text-slate-600">벨벳 소파원단 A</td><td class="p-3 text-right font-medium">₩560,000</td><td>계좌이체</td><td><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">완납</span></td><td class="text-xs text-slate-500">B2B</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===================== 거래처 관리 ===================== -->
+<div id="page-clients" class="page space-y-6">
+  <div class="flex items-center justify-between"><div><h1 class="text-2xl font-bold text-slate-900">거래처 관리</h1><p class="text-sm text-slate-500">B2B 고객사 및 원자재 공급사를 관리합니다</p></div><button class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm">+ 거래처 등록</button></div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">(주)하나인테리어</h3><p class="text-xs text-slate-400">123-45-67890</p></div><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs h-fit">고객</span></div><p class="text-sm text-slate-600">김대표</p><p class="text-xs text-slate-500">📞 02-1234-5678</p><div class="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center"><div><p class="text-xs text-slate-400">총매출</p><p class="text-sm font-bold">₩18.2M</p></div><div><p class="text-xs text-slate-400">거래수</p><p class="text-sm font-bold">23건</p></div><div><p class="text-xs text-slate-400">미수금</p><p class="text-sm font-bold text-red-600">₩6.9M</p></div></div></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">그린홈 커튼</h3><p class="text-xs text-slate-400">678-90-12345</p></div><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs h-fit">고객</span></div><p class="text-sm text-slate-600">한대리</p><p class="text-xs text-slate-500">📞 041-678-9012</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">럭셔리리빙</h3><p class="text-xs text-slate-400">345-67-89012</p></div><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs h-fit">고객</span></div><p class="text-sm text-slate-600">박팀장</p><p class="text-xs text-slate-500">📞 02-345-6789</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">소파킹 가구</h3><p class="text-xs text-slate-400">456-78-90123</p></div><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs h-fit">고객</span></div><p class="text-sm text-slate-600">최사장</p><p class="text-xs text-slate-500">📞 051-456-7890</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">원단나라</h3><p class="text-xs text-slate-400">789-01-23456</p></div><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs h-fit">공급사</span></div><p class="text-sm text-slate-600">강부장</p><p class="text-xs text-slate-500">📞 02-789-0123</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition"><div class="flex justify-between mb-2"><div><h3 class="font-semibold">텍스타일코리아</h3><p class="text-xs text-slate-400">890-12-34567</p></div><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs h-fit">공급사</span></div><p class="text-sm text-slate-600">오과장</p><p class="text-xs text-slate-500">📞 031-890-1234</p></div>
+  </div>
+</div>
+
+<!-- ===================== 미수금 관리 ===================== -->
+<div id="page-receivables" class="page space-y-6">
+  <div><h1 class="text-2xl font-bold text-slate-900">미수금 관리</h1><p class="text-sm text-slate-500">거래처별 외상 미수금을 추적하고 회수를 기록합니다</p></div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border border-l-4 border-l-red-500 p-4"><div class="flex items-center gap-2 mb-1"><span class="text-xs text-slate-500">⚠️ 미수금 총액</span></div><p class="text-2xl font-bold">₩26,605,000</p></div>
+    <div class="bg-white rounded-xl border border-l-4 border-l-orange-500 p-4"><div class="flex items-center gap-2 mb-1"><span class="text-xs text-slate-500">⏰ 연체 금액 (30일+)</span></div><p class="text-2xl font-bold text-orange-600">₩10,594,000</p></div>
+    <div class="bg-white rounded-xl border border-l-4 border-l-blue-500 p-4"><span class="text-xs text-slate-500">미수 건수</span><p class="text-2xl font-bold">25건 / 6곳</p></div>
+  </div>
+  <div class="space-y-3">
+    <div class="bg-white rounded-xl border p-4"><div class="flex justify-between items-center"><div><h3 class="font-semibold">(주)하나인테리어</h3><p class="text-xs text-slate-500">📞 02-1234-5678 · 8건 · <span class="bg-red-100 text-red-700 px-1.5 rounded text-xs">최장 28일</span></p></div><p class="text-xl font-bold text-red-600">₩6,925,000</p></div></div>
+    <div class="bg-white rounded-xl border p-4"><div class="flex justify-between items-center"><div><h3 class="font-semibold">그린홈 커튼</h3><p class="text-xs text-slate-500">📞 041-678-9012 · 5건</p></div><p class="text-xl font-bold text-red-600">₩6,236,000</p></div></div>
+    <div class="bg-white rounded-xl border p-4"><div class="flex justify-between items-center"><div><h3 class="font-semibold">예쁜집 인테리어</h3><p class="text-xs text-slate-500">📞 032-567-8901 · 3건</p></div><p class="text-xl font-bold text-yellow-600">₩5,787,000</p></div></div>
+    <div class="bg-white rounded-xl border p-4"><div class="flex justify-between items-center"><div><h3 class="font-semibold">모던홈 디자인</h3><p class="text-xs text-slate-500">📞 031-234-5678 · 4건</p></div><p class="text-xl font-bold text-yellow-600">₩3,872,000</p></div></div>
+  </div>
+</div>
+
+<!-- ===================== 제품 관리 ===================== -->
+<div id="page-products" class="page space-y-6">
+  <div class="flex items-center justify-between"><div><h1 class="text-2xl font-bold text-slate-900">제품 관리</h1><p class="text-sm text-slate-500">원단·완제품의 원가, 판매가, 마진율을 관리합니다</p></div><button class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm">+ 제품 등록</button></div>
+  <div class="bg-white rounded-xl border p-4 shadow-sm">
+    <h3 class="font-semibold text-sm mb-3">제품 목록 (10개)</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="border-b text-left text-slate-500"><th class="pb-2">제품명</th><th class="pb-2">카테고리</th><th class="pb-2">단위</th><th class="pb-2 text-right">매입가</th><th class="pb-2 text-right">판매가</th><th class="pb-2 text-right">마진율</th><th class="pb-2 text-right">마진액</th></tr></thead>
+      <tbody>
+        <tr class="border-b"><td class="py-2 font-medium">3인 소파 (프리미엄)</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파(완제품)</span></td><td>개</td><td class="text-right">₩700,000</td><td class="text-right font-medium">₩1,500,000</td><td class="text-right font-bold text-green-600">53.3%</td><td class="text-right">₩800,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">2인 소파 (기본)</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파(완제품)</span></td><td>개</td><td class="text-right">₩400,000</td><td class="text-right font-medium">₩850,000</td><td class="text-right font-bold text-green-600">52.9%</td><td class="text-right">₩450,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">맞춤 커튼 (대형)</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">커튼(완제품)</span></td><td>개</td><td class="text-right">₩150,000</td><td class="text-right font-medium">₩350,000</td><td class="text-right font-bold text-green-600">57.1%</td><td class="text-right">₩200,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">맞춤 커튼 (소형)</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">커튼(완제품)</span></td><td>개</td><td class="text-right">₩80,000</td><td class="text-right font-medium">₩180,000</td><td class="text-right font-bold text-green-600">55.6%</td><td class="text-right">₩100,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">실크 벽원단</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">벽원단</span></td><td>미터</td><td class="text-right">₩25,000</td><td class="text-right font-medium">₩45,000</td><td class="text-right font-bold text-green-600">44.4%</td><td class="text-right">₩20,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">벨벳 소파원단 A</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파원단</span></td><td>미터</td><td class="text-right">₩15,000</td><td class="text-right font-medium">₩28,000</td><td class="text-right font-bold text-green-600">46.4%</td><td class="text-right">₩13,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">벨벳 소파원단 B</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">소파원단</span></td><td>미터</td><td class="text-right">₩12,000</td><td class="text-right font-medium">₩22,000</td><td class="text-right font-bold text-green-600">45.5%</td><td class="text-right">₩10,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">린넨 커튼원단</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">커튼원단</span></td><td>미터</td><td class="text-right">₩8,000</td><td class="text-right font-medium">₩18,000</td><td class="text-right font-bold text-green-600">55.6%</td><td class="text-right">₩10,000</td></tr>
+        <tr class="border-b"><td class="py-2 font-medium">면 벽원단</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">벽원단</span></td><td>미터</td><td class="text-right">₩6,000</td><td class="text-right font-medium">₩14,000</td><td class="text-right font-bold text-green-600">57.1%</td><td class="text-right">₩8,000</td></tr>
+        <tr><td class="py-2 font-medium">암막 커튼원단</td><td><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">커튼원단</span></td><td>미터</td><td class="text-right">₩10,000</td><td class="text-right font-medium">₩20,000</td><td class="text-right font-bold text-green-600">50.0%</td><td class="text-right">₩10,000</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===================== 비용 관리 ===================== -->
+<div id="page-costs" class="page space-y-6">
+  <div class="flex items-center justify-between"><div><h1 class="text-2xl font-bold text-slate-900">비용 관리</h1><p class="text-sm text-slate-500">고정비·변동비를 관리하고 비용 구조를 분석합니다</p></div></div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border border-l-4 border-l-red-500 p-4"><p class="text-xs text-slate-500">월간 고정비 합계</p><p class="text-2xl font-bold">₩12,700,000</p><p class="text-xs text-slate-400">연간 ₩152,400,000</p></div>
+    <div class="bg-white rounded-xl border border-l-4 border-l-blue-500 p-4"><p class="text-xs text-slate-500">비용 카테고리</p><p class="text-2xl font-bold">4개</p></div>
+    <div class="bg-white rounded-xl border border-l-4 border-l-green-500 p-4"><p class="text-xs text-slate-500">비용 항목 수</p><p class="text-2xl font-bold">6개</p></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border p-4"><h3 class="font-semibold text-sm mb-3">비용 구조 (월간 환산)</h3><canvas id="costPieChart" height="220"></canvas></div>
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="font-semibold text-sm mb-3">카테고리별 상세</h3>
+      <div class="space-y-3">
+        <div class="border rounded-lg p-3"><div class="flex justify-between mb-1"><span class="font-medium text-sm flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>인건비</span><span class="font-bold text-sm">₩9,000,000/월</span></div><p class="text-xs text-slate-600 ml-5">직원 급여 (3명) — ₩9,000,000 (매월)</p></div>
+        <div class="border rounded-lg p-3"><div class="flex justify-between mb-1"><span class="font-medium text-sm flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>사무실/공장 임대</span><span class="font-bold text-sm">₩2,800,000/월</span></div><div class="text-xs text-slate-600 ml-5 space-y-0.5"><p>공장 월 임대료 — ₩2,000,000</p><p>사무실 월 임대료 — ₩800,000</p></div></div>
+        <div class="border rounded-lg p-3"><div class="flex justify-between mb-1"><span class="font-medium text-sm flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>물류/배송</span><span class="font-bold text-sm">₩500,000/월</span></div><p class="text-xs text-slate-600 ml-5">택배 계약비 — ₩500,000</p></div>
+        <div class="border rounded-lg p-3"><div class="flex justify-between mb-1"><span class="font-medium text-sm flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span>공과금/통신</span><span class="font-bold text-sm">₩400,000/월</span></div><div class="text-xs text-slate-600 ml-5 space-y-0.5"><p>전기/수도/가스 — ₩300,000</p><p>인터넷/전화 — ₩100,000</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 분석/시뮬레이션 ===================== -->
+<div id="page-analysis" class="page space-y-6">
+  <div><h1 class="text-2xl font-bold text-slate-900">분석 / 시뮬레이션</h1><p class="text-sm text-slate-500">매출·제품·채널 분석과 가격 시뮬레이션</p></div>
+  <div class="bg-white rounded-xl border p-4"><h3 class="font-semibold text-sm mb-3">월별 매출/비용/이익 추이</h3><canvas id="monthlyTrendChart" height="200"></canvas></div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border p-4">
+      <h3 class="font-semibold text-sm mb-3">제품별 수익성 (마진율)</h3>
+      <div class="flex gap-3 mb-3 text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span>효자상품</span><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span>육성상품</span><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500"></span>관리상품</span><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>정리검토</span></div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-sm flex-1">3인 소파 (프리미엄)</span><div class="w-20 bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full bg-green-500" style="width:53%"></div></div><span class="text-sm font-bold w-12 text-right">53.3%</span><span class="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs">효자</span></div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-sm flex-1">맞춤 커튼 (대형)</span><div class="w-20 bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full bg-green-500" style="width:57%"></div></div><span class="text-sm font-bold w-12 text-right">57.1%</span><span class="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs">효자</span></div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-sm flex-1">실크 벽원단</span><div class="w-20 bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full bg-blue-500" style="width:44%"></div></div><span class="text-sm font-bold w-12 text-right">44.4%</span><span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs">육성</span></div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-sm flex-1">벨벳 소파원단 A</span><div class="w-20 bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full bg-blue-500" style="width:46%"></div></div><span class="text-sm font-bold w-12 text-right">46.4%</span><span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs">육성</span></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border p-4"><h3 class="font-semibold text-sm mb-3">채널별 매출 비중</h3><canvas id="channelPieChart" height="200"></canvas></div>
+  </div>
+</div>
+
+<!-- ===================== AI CFO 자문 ===================== -->
+<div id="page-advisor" class="page">
+  <div class="mb-4"><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">🤖 AI CFO 자문</h1><p class="text-sm text-slate-500">실시간 재무 데이터를 기반으로 전략적 자문을 받습니다</p></div>
+  <div class="bg-white rounded-xl border shadow-sm flex flex-col" style="height:500px">
+    <div class="flex-1 p-6 flex flex-col items-center justify-center text-center">
+      <div class="text-6xl mb-4 opacity-30">🤖</div>
+      <h3 class="text-lg font-semibold text-slate-700 mb-2">AI CFO에게 물어보세요</h3>
+      <p class="text-sm text-slate-400 mb-6 max-w-md">실시간 재무 데이터(매출, 미수금, 비용, 제품 분석)를 기반으로 전략적 경영 자문을 제공합니다</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg">
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 이번 달 경영 현황을 브리핑해주세요</button>
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 미수금이 많은 거래처를 분석해주세요</button>
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 어떤 제품에 더 집중해야 하나요?</button>
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 비용 절감할 수 있는 부분이 있을까요?</button>
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 가격 인상을 고려 중인데 어떤 제품부터?</button>
+        <button class="text-left text-sm p-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 text-slate-600">💡 손익분기점은 얼마인가요?</button>
+      </div>
+    </div>
+    <div class="p-4 border-t flex gap-2"><input class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="경영 관련 질문을 입력하세요..."><button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">전송</button></div>
+  </div>
+</div>
+
+<!-- ===================== 설정 ===================== -->
+<div id="page-settings" class="page space-y-6 max-w-3xl">
+  <div><h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">⚙️ 설정</h1><p class="text-sm text-slate-500">회사 정보, API 키, 데이터 관리를 설정합니다</p></div>
+  <div class="bg-white rounded-xl border p-4 space-y-3">
+    <h3 class="font-semibold text-sm">🏢 회사 정보</h3>
+    <div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-slate-500">회사명</label><input class="w-full border rounded px-3 py-1.5 text-sm" value="인테리어 원단 회사"></div><div><label class="text-xs text-slate-500">사업자번호</label><input class="w-full border rounded px-3 py-1.5 text-sm" placeholder="000-00-00000"></div></div>
+    <div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-slate-500">대표자명</label><input class="w-full border rounded px-3 py-1.5 text-sm"></div><div><label class="text-xs text-slate-500">전화번호</label><input class="w-full border rounded px-3 py-1.5 text-sm"></div></div>
+    <button class="bg-slate-900 text-white px-4 py-1.5 rounded text-sm">저장</button>
+  </div>
+  <div class="bg-white rounded-xl border p-4">
+    <h3 class="font-semibold text-sm mb-2">🔑 AI CFO 설정</h3>
+    <div class="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+      <p class="font-medium mb-1">설정 방법:</p>
+      <ol class="list-decimal list-inside text-xs space-y-1"><li>.env 파일을 엽니다</li><li>ANTHROPIC_API_KEY="sk-ant-..." 에 API 키를 입력합니다</li><li>서버를 재시작합니다</li></ol>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl border p-4">
+    <h3 class="font-semibold text-sm mb-2">💾 데이터 관리</h3>
+    <div class="flex gap-2"><button class="border px-3 py-1.5 rounded text-sm">📥 거래 내역</button><button class="border px-3 py-1.5 rounded text-sm">📥 제품 목록</button><button class="border px-3 py-1.5 rounded text-sm">📥 거래처 목록</button></div>
+  </div>
+  <div class="bg-white rounded-xl border p-3 flex justify-between text-sm text-slate-500"><span>인테리어 원단 CFO v1.0</span><span>Next.js 15 + Prisma + SQLite + Claude API</span></div>
+</div>
+
+  </main>
+</div>
+
+<script>
+// 날짜 표시
+const now = new Date();
+document.getElementById('headerDate').textContent = now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+// 페이지 전환
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(s => { s.classList.remove('active'); s.classList.add('text-slate-300'); });
+  document.querySelector(`[data-page="${pageId}"]`).classList.add('active');
+  document.querySelector(`[data-page="${pageId}"]`).classList.remove('text-slate-300');
+}
+
+// 차트: 매출 추이
+new Chart(document.getElementById('salesChart'), {
+  type: 'line', data: {
+    labels: ['04/07','04/08','04/09','04/10','04/11','04/12','04/13'],
+    datasets: [
+      { label: '매출', data: [3200000,4100000,2800000,5600000,3900000,2400000,5650000], borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', fill:true, tension:0.3 },
+      { label: '비용', data: [800000,150000,200000,0,180000,100000,152537], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.05)', fill:true, tension:0.3 },
+      { label: '이익', data: [2400000,3950000,2600000,5600000,3720000,2300000,5497463], borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.05)', fill:true, tension:0.3 },
+    ]
+  }, options: { plugins: { legend: { position:'bottom', labels:{boxWidth:12,font:{size:11}} }}, scales: { y: { ticks: { callback: v => (v/10000)+'만' }}}}
+});
+
+// 차트: 제품별 매출
+new Chart(document.getElementById('productChart'), {
+  type: 'bar', data: {
+    labels: ['3인 소파','2인 소파','벨벳A','실크 벽','맞춤커튼(대)','벨벳B','암막','린넨','맞춤(소)','면 벽'],
+    datasets: [{ label: '매출', data: [18000000,8500000,5600000,4500000,3500000,3300000,3000000,2700000,1800000,1400000], backgroundColor:['#22c55e','#22c55e','#3b82f6','#3b82f6','#22c55e','#3b82f6','#f59e0b','#3b82f6','#f59e0b','#f59e0b'] }]
+  }, options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{callback:v=>(v/10000)+'만'}}}}
+});
+
+// 차트: 미수금 경과
+new Chart(document.getElementById('arChart'), {
+  type: 'bar', data: {
+    labels: ['30일 이내','30~60일','60~90일','90일 초과'],
+    datasets: [{ label: '미수금', data: [16011000,6294000,4300000,0], backgroundColor:['#22c55e','#f59e0b','#f97316','#ef4444'] }]
+  }, options: { plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v=>(v/10000)+'만'}}}}
+});
+
+// 차트: 워터폴
+new Chart(document.getElementById('waterfallChart'), {
+  type: 'bar', data: {
+    labels: ['매출','변동비','공헌이익','일일고정비','영업이익'],
+    datasets: [{ data: [5650000,-2650000,3000000,-577273,2422727], backgroundColor:['#3b82f6','#ef4444','#22c55e','#f59e0b','#22c55e'] }]
+  }, options: { plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v=>Math.abs(v/10000)+'만'}}}}
+});
+
+// 차트: 비용 파이
+new Chart(document.getElementById('costPieChart'), {
+  type: 'pie', data: {
+    labels: ['인건비','사무실/공장 임대','물류/배송','공과금/통신'],
+    datasets: [{ data: [9000000,2800000,500000,400000], backgroundColor:['#ef4444','#f59e0b','#22c55e','#8b5cf6'] }]
+  }, options: { plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}}}
+});
+
+// 차트: 월별 추이
+new Chart(document.getElementById('monthlyTrendChart'), {
+  type: 'bar', data: {
+    labels: ['2월','3월','4월'],
+    datasets: [
+      { label:'매출', data: [82000000,78000000,35830000], backgroundColor:'#3b82f6' },
+      { label:'비용', data: [8500000,6200000,3897000], backgroundColor:'#ef4444' },
+      { label:'이익', data: [73500000,71800000,31933000], backgroundColor:'#22c55e' },
+    ]
+  }, options: { plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}, scales:{y:{ticks:{callback:v=>(v/10000)+'만'}}}}
+});
+
+// 차트: 채널별
+new Chart(document.getElementById('channelPieChart'), {
+  type: 'pie', data: {
+    labels: ['B2B','B2C 오프라인','B2C 온라인'],
+    datasets: [{ data: [62,22,16], backgroundColor:['#3b82f6','#22c55e','#f59e0b'] }]
+  }, options: { plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}}}
+});
+</script>
+
+</body>
+</html>

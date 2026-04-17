@@ -19,10 +19,15 @@ interface SettlementData {
   date: string; dateLabel: string
   totalSales: number; totalExpenses: number; totalPurchases: number
   salesCount: number; expenseCount: number
-  totalVariableCost: number; totalContributionMargin: number; contributionMarginRate: number
+  totalVariableCost: number; totalCOGS: number; totalContributionMargin: number; contributionMarginRate: number
+  variableCostBreakdown: {
+    cogs: { label: string; amount: number }
+    expenses: { label: string; amount: number; details: { description: string; amount: number; clientName: string | null }[] }
+    purchases: { label: string; amount: number; details: { description: string; amount: number; clientName: string | null }[] }
+  }
   productCM: {
     productId: string; productName: string; category: string; unit: string
-    revenue: number; variableCost: number; quantity: number
+    revenue: number; cogs: number; quantity: number
     contributionMargin: number; contributionMarginRate: number
   }[]
   monthlyFixedCost: number; dailyFixedCost: number
@@ -83,10 +88,14 @@ export default function SettlementPage() {
   const bepColor = (rate: number) => rate >= 100 ? 'text-green-600' : rate >= 70 ? 'text-yellow-600' : 'text-red-600'
   const bepBg = (rate: number) => rate >= 100 ? 'bg-green-50 border-green-200' : rate >= 70 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'
 
-  // 워터폴 차트 데이터
+  const vcb = data.variableCostBreakdown
+
+  // 워터폴 차트 데이터 (변동비를 매출원가/비용/매입으로 분리)
   const waterfallData = [
     { name: '매출', value: data.totalSales, fill: '#3b82f6' },
-    { name: '변동비', value: -data.totalVariableCost, fill: '#ef4444' },
+    { name: '매출원가', value: -vcb.cogs.amount, fill: '#ef4444' },
+    ...(vcb.expenses.amount > 0 ? [{ name: '비용', value: -vcb.expenses.amount, fill: '#f97316' }] : []),
+    ...(vcb.purchases.amount > 0 ? [{ name: '매입', value: -vcb.purchases.amount, fill: '#e11d48' }] : []),
     { name: '공헌이익', value: data.totalContributionMargin, fill: '#22c55e' },
     { name: '일일고정비', value: -data.dailyFixedCost, fill: '#f59e0b' },
     { name: '영업이익', value: data.dailyOperatingProfit, fill: data.dailyOperatingProfit >= 0 ? '#22c55e' : '#ef4444' },
@@ -173,7 +182,24 @@ export default function SettlementPage() {
             </div>
             <div className="mt-3 p-3 bg-slate-50 rounded-lg text-sm space-y-1">
               <div className="flex justify-between"><span>매출</span><span className="font-medium">{formatKRW(data.totalSales)}</span></div>
-              <div className="flex justify-between text-red-600"><span>(-) 변동비 (매출원가)</span><span>{formatKRW(data.totalVariableCost)}</span></div>
+              <div className="flex justify-between text-red-600"><span>(-) 매출원가 (제품원가×수량)</span><span>{formatKRW(vcb.cogs.amount)}</span></div>
+              {vcb.expenses.amount > 0 && (
+                <div>
+                  <div className="flex justify-between text-orange-600"><span>(-) 비용 (당일 지출)</span><span>{formatKRW(vcb.expenses.amount)}</span></div>
+                  {vcb.expenses.details.map((d, i) => (
+                    <div key={i} className="flex justify-between text-xs text-orange-400 pl-4"><span>{d.description}</span><span>{formatKRW(d.amount)}</span></div>
+                  ))}
+                </div>
+              )}
+              {vcb.purchases.amount > 0 && (
+                <div>
+                  <div className="flex justify-between text-rose-600"><span>(-) 원자재 매입</span><span>{formatKRW(vcb.purchases.amount)}</span></div>
+                  {vcb.purchases.details.map((d, i) => (
+                    <div key={i} className="flex justify-between text-xs text-rose-400 pl-4"><span>{d.description}{d.clientName ? ` (${d.clientName})` : ''}</span><span>{formatKRW(d.amount)}</span></div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-between text-xs text-slate-400 border-t pt-1"><span>변동비 합계</span><span>{formatKRW(data.totalVariableCost)}</span></div>
               <div className="flex justify-between font-bold text-green-700 border-t pt-1"><span>= 공헌이익</span><span>{formatKRW(data.totalContributionMargin)}</span></div>
               <div className="flex justify-between text-yellow-600"><span>(-) 일일 고정비 배분</span><span>{formatKRW(data.dailyFixedCost)}</span></div>
               <div className="flex justify-between font-bold border-t pt-1">
@@ -255,7 +281,7 @@ export default function SettlementPage() {
                     <th className="p-2 font-medium">카테고리</th>
                     <th className="p-2 font-medium text-right">수량</th>
                     <th className="p-2 font-medium text-right">매출</th>
-                    <th className="p-2 font-medium text-right">변동비</th>
+                    <th className="p-2 font-medium text-right">매출원가</th>
                     <th className="p-2 font-medium text-right">공헌이익</th>
                     <th className="p-2 font-medium text-right">공헌이익률</th>
                   </tr>
@@ -267,7 +293,7 @@ export default function SettlementPage() {
                       <td className="p-2"><Badge variant="secondary">{getCategoryName(p.category)}</Badge></td>
                       <td className="p-2 text-right">{p.quantity} {getUnitName(p.unit)}</td>
                       <td className="p-2 text-right">{formatKRW(p.revenue)}</td>
-                      <td className="p-2 text-right text-red-600">{formatKRW(p.variableCost)}</td>
+                      <td className="p-2 text-right text-red-600">{formatKRW(p.cogs)}</td>
                       <td className="p-2 text-right font-bold text-green-700">{formatKRW(p.contributionMargin)}</td>
                       <td className="p-2 text-right">
                         <span className={p.contributionMarginRate >= 40 ? 'text-green-600 font-bold' : p.contributionMarginRate >= 20 ? 'text-yellow-600' : 'text-red-600'}>
@@ -279,7 +305,7 @@ export default function SettlementPage() {
                   <tr className="bg-slate-50 font-bold">
                     <td className="p-2" colSpan={3}>합계</td>
                     <td className="p-2 text-right">{formatKRW(data.totalSales)}</td>
-                    <td className="p-2 text-right text-red-600">{formatKRW(data.totalVariableCost)}</td>
+                    <td className="p-2 text-right text-red-600">{formatKRW(data.totalCOGS)}</td>
                     <td className="p-2 text-right text-green-700">{formatKRW(data.totalContributionMargin)}</td>
                     <td className="p-2 text-right">{formatPercent(data.contributionMarginRate)}</td>
                   </tr>
