@@ -154,6 +154,7 @@ model CostCategory {
   isActive Boolean @default(true) @map("is_active")
 
   recurringCosts RecurringCost[]
+  monthlyCosts   MonthlyCost[]
 
   @@map("cost_categories")
 }
@@ -172,6 +173,26 @@ model RecurringCost {
   costCategory CostCategory @relation(fields: [costCategoryId], references: [id])
 
   @@map("recurring_costs")
+}
+
+// ============================================
+// 월별 실적 비용 (Monthly Actual Costs)
+// ============================================
+model MonthlyCost {
+  id             String   @id @default(cuid())
+  costCategoryId String   @map("cost_category_id")
+  yearMonth      String   @map("year_month") // "2026-04"
+  amount         Int      @default(0)
+  source         String   @default("MANUAL") // MANUAL, PDF_UPLOAD
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  costCategory CostCategory @relation(fields: [costCategoryId], references: [id])
+
+  @@unique([costCategoryId, yearMonth])
+  @@index([yearMonth])
+  @@map("monthly_costs")
 }
 
 // ============================================

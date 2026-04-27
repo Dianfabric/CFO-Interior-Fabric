@@ -41,7 +41,8 @@ export function calcMarginRate(sellingPrice: number, purchasePrice: number): num
 }
 
 // 마진율 포맷
-export function formatPercent(value: number): string {
+export function formatPercent(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '0.0%'
   return `${value.toFixed(1)}%`
 }
 
