@@ -7,9 +7,12 @@ import ProductChart from '@/components/dashboard/ProductChart'
 import ARSummaryChart from '@/components/dashboard/ARSummaryChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatKRW, formatDate, getTransactionTypeName, getPaymentMethodName, getPaymentStatusName } from '@/lib/formatters'
+import { formatKRW, formatDate, formatPercent, getTransactionTypeName, getPaymentMethodName, getPaymentStatusName, getCategoryName } from '@/lib/formatters'
 import { Bot, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell,
+} from 'recharts'
 
 interface DashboardData {
   kpi: {
@@ -36,6 +39,12 @@ interface DashboardData {
     channel: string
     description: string
   }[]
+  yearlyAnalysis: {
+    monthlyBreakdown: { month: string; label: string; sales: number; expenses: number; profit: number }[]
+    quarterlyBreakdown: { quarter: string; sales: number; expenses: number; profit: number }[]
+    channelBreakdown: { channel: string; sales: number; cost: number; profit: number; count: number }[]
+    productBreakdown: { name: string; category: string; sales: number; cost: number; profit: number; marginRate: number; quantity: number }[]
+  }
 }
 
 export default function Dashboard() {
@@ -181,6 +190,188 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* ===== 금년도 종합 분석 ===== */}
+      {data.yearlyAnalysis && (
+        <>
+          <div className="pt-4">
+            <h2 className="text-xl font-bold text-slate-900 mb-1">{new Date().getFullYear()}년 종합 분석</h2>
+            <p className="text-sm text-slate-500 mb-4">분기별·월별·채널별·제품별 매출과 순이익을 확인합니다</p>
+          </div>
+
+          {/* 분기별 매출/순이익 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle className="text-base">분기별 매출 / 순이익</CardTitle></CardHeader>
+              <CardContent>
+                {data.yearlyAnalysis.quarterlyBreakdown.length === 0 ? (
+                  <p className="text-center text-slate-400 py-8">데이터 없음</p>
+                ) : (
+                  <>
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data.yearlyAnalysis.quarterlyBreakdown}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="quarter" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                          <Tooltip formatter={(v: number) => formatKRW(v)} />
+                          <Legend />
+                          <Bar dataKey="sales" name="매출" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="profit" name="순이익" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b text-slate-500"><th className="pb-2 text-left">분기</th><th className="pb-2 text-right">매출</th><th className="pb-2 text-right">비용</th><th className="pb-2 text-right">순이익</th><th className="pb-2 text-right">이익률</th></tr></thead>
+                        <tbody>
+                          {data.yearlyAnalysis.quarterlyBreakdown.map((q) => (
+                            <tr key={q.quarter} className="border-b last:border-0">
+                              <td className="py-2 font-medium">{q.quarter}</td>
+                              <td className="py-2 text-right">{formatKRW(q.sales)}</td>
+                              <td className="py-2 text-right text-red-600">{formatKRW(q.expenses)}</td>
+                              <td className="py-2 text-right font-bold text-green-700">{formatKRW(q.profit)}</td>
+                              <td className="py-2 text-right">{q.sales > 0 ? formatPercent((q.profit / q.sales) * 100) : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 월별 매출/순이익 */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">월별 매출 / 순이익</CardTitle></CardHeader>
+              <CardContent>
+                {data.yearlyAnalysis.monthlyBreakdown.length === 0 ? (
+                  <p className="text-center text-slate-400 py-8">데이터 없음</p>
+                ) : (
+                  <>
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data.yearlyAnalysis.monthlyBreakdown}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                          <Tooltip formatter={(v: number) => formatKRW(v)} />
+                          <Legend />
+                          <Bar dataKey="sales" name="매출" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="profit" name="순이익" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b text-slate-500"><th className="pb-2 text-left">월</th><th className="pb-2 text-right">매출</th><th className="pb-2 text-right">비용</th><th className="pb-2 text-right">순이익</th><th className="pb-2 text-right">이익률</th></tr></thead>
+                        <tbody>
+                          {data.yearlyAnalysis.monthlyBreakdown.map((m) => (
+                            <tr key={m.month} className="border-b last:border-0">
+                              <td className="py-2 font-medium">{m.month}</td>
+                              <td className="py-2 text-right">{formatKRW(m.sales)}</td>
+                              <td className="py-2 text-right text-red-600">{formatKRW(m.expenses)}</td>
+                              <td className="py-2 text-right font-bold text-green-700">{formatKRW(m.profit)}</td>
+                              <td className="py-2 text-right">{m.sales > 0 ? formatPercent((m.profit / m.sales) * 100) : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 채널별 + 제품별 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 채널(직군)별 매출/순이익 */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">채널별 매출 / 순이익</CardTitle></CardHeader>
+              <CardContent>
+                {data.yearlyAnalysis.channelBreakdown.length === 0 ? (
+                  <p className="text-center text-slate-400 py-8">데이터 없음</p>
+                ) : (
+                  <>
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data.yearlyAnalysis.channelBreakdown} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                          <YAxis type="category" dataKey="channel" tick={{ fontSize: 12 }} width={90} />
+                          <Tooltip formatter={(v: number) => formatKRW(v)} />
+                          <Legend />
+                          <Bar dataKey="sales" name="매출" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="profit" name="순이익" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b text-slate-500"><th className="pb-2 text-left">채널</th><th className="pb-2 text-right">매출</th><th className="pb-2 text-right">원가</th><th className="pb-2 text-right">순이익</th><th className="pb-2 text-right">건수</th></tr></thead>
+                        <tbody>
+                          {data.yearlyAnalysis.channelBreakdown.map((ch) => (
+                            <tr key={ch.channel} className="border-b last:border-0">
+                              <td className="py-2 font-medium">{ch.channel}</td>
+                              <td className="py-2 text-right">{formatKRW(ch.sales)}</td>
+                              <td className="py-2 text-right text-red-600">{formatKRW(ch.cost)}</td>
+                              <td className="py-2 text-right font-bold text-green-700">{formatKRW(ch.profit)}</td>
+                              <td className="py-2 text-right text-slate-500">{ch.count}건</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 제품별 매출/순이익 */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">제품별 매출 / 순이익</CardTitle></CardHeader>
+              <CardContent>
+                {data.yearlyAnalysis.productBreakdown.length === 0 ? (
+                  <p className="text-center text-slate-400 py-8">데이터 없음</p>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-white"><tr className="border-b text-slate-500"><th className="pb-2 text-left">제품</th><th className="pb-2 text-left">카테고리</th><th className="pb-2 text-right">매출</th><th className="pb-2 text-right">순이익</th><th className="pb-2 text-right">마진율</th></tr></thead>
+                      <tbody>
+                        {data.yearlyAnalysis.productBreakdown.map((p, i) => (
+                          <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                            <td className="py-2 font-medium">{p.name}</td>
+                            <td className="py-2"><Badge variant="secondary">{getCategoryName(p.category)}</Badge></td>
+                            <td className="py-2 text-right">{formatKRW(p.sales)}</td>
+                            <td className="py-2 text-right font-bold text-green-700">{formatKRW(p.profit)}</td>
+                            <td className={`py-2 text-right font-bold ${p.marginRate >= 40 ? 'text-green-600' : p.marginRate >= 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {formatPercent(p.marginRate)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-slate-50 font-bold">
+                          <td className="py-2" colSpan={2}>합계</td>
+                          <td className="py-2 text-right">{formatKRW(data.yearlyAnalysis.productBreakdown.reduce((s, p) => s + p.sales, 0))}</td>
+                          <td className="py-2 text-right text-green-700">{formatKRW(data.yearlyAnalysis.productBreakdown.reduce((s, p) => s + p.profit, 0))}</td>
+                          <td className="py-2 text-right">
+                            {(() => {
+                              const ts = data.yearlyAnalysis.productBreakdown.reduce((s, p) => s + p.sales, 0)
+                              const tp = data.yearlyAnalysis.productBreakdown.reduce((s, p) => s + p.profit, 0)
+                              return ts > 0 ? formatPercent((tp / ts) * 100) : '-'
+                            })()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   )
 }

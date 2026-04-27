@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { chatWithAdvisor } from '@/lib/claude'
 import { startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns'
 import type { FinancialContext } from '@/lib/calculations'
+import { buildClientMap } from '@/lib/airtable'
 
 async function buildFinancialContext(): Promise<FinancialContext> {
   const now = new Date()
@@ -21,10 +22,13 @@ async function buildFinancialContext(): Promise<FinancialContext> {
     prisma.product.findMany(),
   ])
 
-  const receivables = await prisma.accountsReceivable.findMany({
-    where: { status: { in: ['OUTSTANDING', 'PARTIAL', 'OVERDUE'] } },
-    include: { client: true }, orderBy: { remainingAmount: 'desc' }, take: 5,
-  })
+  const [receivables, clientMap] = await Promise.all([
+    prisma.accountsReceivable.findMany({
+      where: { status: { in: ['OUTSTANDING', 'PARTIAL', 'OVERDUE'] } },
+      orderBy: { remainingAmount: 'desc' }, take: 5,
+    }),
+    buildClientMap(),
+  ])
 
   const mSales = monthSales._sum.totalAmount || 0
   const mExp = monthExp._sum.totalAmount || 0
@@ -86,7 +90,7 @@ async function buildFinancialContext(): Promise<FinancialContext> {
       contributionMargin: 0, breakEvenVolume: 0, breakEvenRevenue: 0,
     },
     topReceivables: receivables.map(ar => ({
-      clientName: ar.client.name, amount: ar.remainingAmount,
+      clientName: clientMap.get(ar.clientId)?.name || ar.clientId, amount: ar.remainingAmount,
       daysOverdue: differenceInDays(now, ar.createdAt),
     })),
   }

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { buildClientMap } from '@/lib/airtable'
 import {
   startOfDay,
   startOfMonth,
   endOfMonth,
+  startOfYear,
+  endOfYear,
   subMonths,
   subDays,
   format,
@@ -56,7 +59,6 @@ export async function GET() {
     // 미수금 경과 분석
     const receivables = await prisma.accountsReceivable.findMany({
       where: { status: { in: ['OUTSTANDING', 'PARTIAL', 'OVERDUE'] } },
-      include: { client: true },
     })
 
     const arAging = [
@@ -130,15 +132,93 @@ export async function GET() {
     )
 
     // 최근 거래 10건
-    const recentTransactions = await prisma.transaction.findMany({
-      orderBy: { date: 'desc' },
-      take: 10,
-      include: { client: true, items: { include: { product: true } } },
-    })
+    const [recentTransactions, clientMap] = await Promise.all([
+      prisma.transaction.findMany({
+        orderBy: { date: 'desc' },
+        take: 10,
+        include: { items: { include: { product: true } } },
+      }),
+      buildClientMap(),
+    ])
 
     const monthSalesAmt = monthSales._sum.totalAmount || 0
     const monthExpAmt = monthExpenses._sum.totalAmount || 0
     const monthProfit = monthSalesAmt - monthExpAmt
+
+    // ===== 금년도 월별 매출/순이익 =====
+    const yearStart = startOfYear(now)
+    const yearEnd = endOfYear(now)
+    const monthlyBreakdown: { month: string; label: string; sales: number; expenses: number; profit: number }[] = []
+    for (let m = 0; m < 12; m++) {
+      const mStart = new Date(now.getFullYear(), m, 1)
+      const mEnd = endOfMonth(mStart)
+      if (mStart > now) break
+      const [mSales, mExp] = await Promise.all([
+        prisma.transaction.aggregate({ where: { type: 'SALE', date: { gte: mStart, lte: mEnd } }, _sum: { totalAmount: true } }),
+        prisma.transaction.aggregate({ where: { type: { in: ['EXPENSE', 'PURCHASE'] }, date: { gte: mStart, lte: mEnd } }, _sum: { totalAmount: true } }),
+      ])
+      const s = mSales._sum.totalAmount || 0
+      const e = mExp._sum.totalAmount || 0
+      monthlyBreakdown.push({ month: `${m + 1}월`, label: `${m + 1}월`, sales: s, expenses: e, profit: s - e })
+    }
+
+    // ===== 금년도 분기별 매출/순이익 =====
+    const quarterlyBreakdown: { quarter: string; sales: number; expenses: number; profit: number }[] = []
+    for (let q = 0; q < 4; q++) {
+      const qStart = new Date(now.getFullYear(), q * 3, 1)
+      const qEnd = endOfMonth(new Date(now.getFullYear(), q * 3 + 2, 1))
+      if (qStart > now) break
+      const [qSales, qExp] = await Promise.all([
+        prisma.transaction.aggregate({ where: { type: 'SALE', date: { gte: qStart, lte: qEnd } }, _sum: { totalAmount: true } }),
+        prisma.transaction.aggregate({ where: { type: { in: ['EXPENSE', 'PURCHASE'] }, date: { gte: qStart, lte: qEnd } }, _sum: { totalAmount: true } }),
+      ])
+      const s = qSales._sum.totalAmount || 0
+      const e = qExp._sum.totalAmount || 0
+      quarterlyBreakdown.push({ quarter: `Q${q + 1}`, sales: s, expenses: e, profit: s - e })
+    }
+
+    // ===== 채널(직군)별 매출/순이익 =====
+    const channelSalesRaw = await prisma.transaction.groupBy({
+      by: ['channel'],
+      where: { type: 'SALE', date: { gte: yearStart, lte: yearEnd } },
+      _sum: { totalAmount: true }, _count: true,
+    })
+    // 채널별 비용은 매출원가로 근사 (items에서 product purchasePrice 기반)
+    const channelBreakdown = await Promise.all(
+      channelSalesRaw.map(async (ch) => {
+        const items = await prisma.transactionItem.findMany({
+          where: { transaction: { type: 'SALE', channel: ch.channel, date: { gte: yearStart, lte: yearEnd } } },
+          include: { product: true },
+        })
+        const cost = items.reduce((s, it) => s + ((it.product?.purchasePrice || 0) * it.quantity), 0)
+        const sales = ch._sum.totalAmount || 0
+        return {
+          channel: ch.channel === 'B2B' ? 'B2B' : ch.channel === 'B2C_OFFLINE' ? 'B2C 오프라인' : 'B2C 온라인',
+          sales, cost, profit: sales - cost, count: ch._count,
+        }
+      })
+    )
+
+    // ===== 제품별 연간 매출/순이익 =====
+    const yearProductSales = await prisma.transactionItem.groupBy({
+      by: ['productId'],
+      where: { transaction: { type: 'SALE', date: { gte: yearStart, lte: yearEnd } }, productId: { not: null } },
+      _sum: { amount: true, quantity: true },
+      orderBy: { _sum: { amount: 'desc' } },
+    })
+    const products = await prisma.product.findMany()
+    const productBreakdown = yearProductSales.map((ps) => {
+      const prod = products.find(p => p.id === ps.productId)
+      const revenue = ps._sum.amount || 0
+      const cost = (prod?.purchasePrice || 0) * (ps._sum.quantity || 0)
+      return {
+        name: prod?.name || '알 수 없음',
+        category: prod?.category || '',
+        sales: revenue, cost, profit: revenue - cost,
+        marginRate: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+        quantity: ps._sum.quantity || 0,
+      }
+    })
 
     return NextResponse.json({
       kpi: {
@@ -158,13 +238,20 @@ export async function GET() {
         id: t.id,
         date: t.date,
         type: t.type,
-        clientName: t.client?.name || (t.channel === 'B2B' ? '-' : 'B2C 현금'),
+        clientName: (t.clientId ? clientMap.get(t.clientId)?.name : null) || (t.channel === 'B2B' ? '-' : 'B2C 현금'),
         totalAmount: t.totalAmount,
         paymentMethod: t.paymentMethod,
         paymentStatus: t.paymentStatus,
         channel: t.channel,
         description: t.description,
       })),
+      // 금년도 분석
+      yearlyAnalysis: {
+        monthlyBreakdown,
+        quarterlyBreakdown,
+        channelBreakdown,
+        productBreakdown,
+      },
     })
   } catch (error) {
     console.error('Dashboard API Error:', error)

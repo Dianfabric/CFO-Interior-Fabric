@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 
@@ -30,6 +31,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex bg-slate-50">
+        {/* Google Identity Services — 구글 드라이브 OAuth */}
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <Sidebar />
         <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
           <Header />

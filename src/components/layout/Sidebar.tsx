@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarCheck,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -30,6 +31,7 @@ const menuItems = [
   { href: '/costs', label: '비용 관리', icon: Wallet },
   { href: '/analysis', label: '분석/시뮬레이션', icon: BarChart3 },
   { href: '/advisor', label: 'AI CFO 자문', icon: Bot },
+  { href: '/documents', label: '공문 작성', icon: FileText },
   { href: '/settings', label: '설정', icon: Settings },
 ]
 

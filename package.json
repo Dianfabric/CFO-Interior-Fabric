@@ -19,6 +19,8 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "lucide-react": "^1.8.0",
     "next": "^15.5.15",
     "next-auth": "^5.0.0-beta.30",

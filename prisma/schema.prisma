@@ -25,28 +25,9 @@ model User {
   @@map("users")
 }
 
-// ============================================
-// 거래처 (Clients) - B2B 고객 및 공급업체
-// ============================================
-model Client {
-  id             String   @id @default(cuid())
-  name           String
-  businessNumber String?  @map("business_number") // 사업자번호
-  contactName    String?  @map("contact_name")
-  phone          String?
-  email          String?
-  address        String?
-  type           String   @default("CUSTOMER") // CUSTOMER, SUPPLIER, BOTH
-  notes          String?
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  transactions       Transaction[]
-  accountsReceivable AccountsReceivable[]
-
-  @@map("clients")
-}
+// 거래처(Clients)는 Airtable에서 관리 (dian-quote와 공유)
+// Base: appcr2VDa4y17bcwm / Table: tblSCHwKL8RQXSJKS
+// clientId 컬럼들은 Airtable record ID (rec...) 문자열을 저장
 
 // ============================================
 // 제품 (Products) - 원단 및 완제품
@@ -59,6 +40,9 @@ model Product {
   purchasePrice Int      @default(0) @map("purchase_price")  // 매입가 (원)
   sellingPrice  Int      @default(0) @map("selling_price")   // 판매가 (원)
   description   String?
+  spec          String?  // 규격(폭) — Sheets column D (e.g. "1400mm")
+  alias         String?  // 별칭    — Sheets column F
+  source        String   @default("LOCAL") // "SHEETS" | "LOCAL"
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -87,7 +71,6 @@ model Transaction {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  client    Client? @relation(fields: [clientId], references: [id])
   createdBy User?   @relation(fields: [createdById], references: [id])
 
   items              TransactionItem[]
@@ -135,7 +118,6 @@ model AccountsReceivable {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  client      Client      @relation(fields: [clientId], references: [id])
   transaction Transaction @relation(fields: [transactionId], references: [id])
   payments    ArPayment[]
 
@@ -239,4 +221,53 @@ model ExcelImport {
   uploader User @relation(fields: [uploadedBy], references: [id])
 
   @@map("excel_imports")
+}
+
+// ============================================
+// 회사 프로필 (Company Profile) - 공문/견적서 발신 정보
+// 단일 레코드. id = 'singleton'으로 고정 사용.
+// ============================================
+model CompanyProfile {
+  id              String   @id @default("singleton")
+  name            String   @default("")
+  businessNumber  String?  @map("business_number")
+  representative  String?
+  phone           String?
+  fax             String?
+  address         String?
+  email           String?
+  website         String?
+  bankInfo        String?  @map("bank_info")
+  logoPath        String?  @map("logo_path")  // /seal.png 등 public 경로
+  sealPath        String?  @map("seal_path")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("company_profile")
+}
+
+// ============================================
+// 공문 (Official Documents)
+// ============================================
+model OfficialDocument {
+  id              String   @id @default(cuid())
+  documentNumber  String   @unique @map("document_number") // 2026042701
+  type            String   // PRICE_CHANGE, HOLIDAY, PAYMENT_REQUEST, PRICE_INFO
+  title           String
+  recipientClientId String? @map("recipient_client_id")
+  recipientName   String   @map("recipient_name")     // 수신 (스냅샷)
+  ccLine          String?  @map("cc_line")             // 참조
+  senderLine      String   @map("sender_line")         // 발신 (스냅샷)
+  bodyText        String   @map("body_text")           // 본문 (제목과 표 사이)
+  tableJson       String?  @map("table_json")          // 표 데이터 (JSON)
+  metaJson        String?  @map("meta_json")           // 유형별 메타 (JSON)
+  driveFileId     String?  @map("drive_file_id")
+  driveJpgId      String?  @map("drive_jpg_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // recipient는 Airtable에서 관리 (recipientClientId = Airtable record ID)
+
+  @@index([type, createdAt])
+  @@index([documentNumber])
+  @@map("official_documents")
 }

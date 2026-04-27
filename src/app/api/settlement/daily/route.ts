@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, format, getDay } from 'date-fns'
+import { buildClientMap } from '@/lib/airtable'
 
 // 영업일수 (토/일 제외한 평균)
 const BUSINESS_DAYS_PER_MONTH = 22
@@ -14,13 +15,13 @@ export async function GET(request: NextRequest) {
     const dayEnd = endOfDay(targetDate)
 
     // === 1. 오늘 거래 데이터 ===
-    const todayTransactions = await prisma.transaction.findMany({
-      where: { date: { gte: dayStart, lte: dayEnd } },
-      include: {
-        items: { include: { product: true } },
-        client: { select: { name: true } },
-      },
-    })
+    const [todayTransactions, clientMap] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { date: { gte: dayStart, lte: dayEnd } },
+        include: { items: { include: { product: true } } },
+      }),
+      buildClientMap(),
+    ])
 
     // 매출/비용/매입 분류
     const sales = todayTransactions.filter(t => t.type === 'SALE')
@@ -70,14 +71,14 @@ export async function GET(request: NextRequest) {
     const expenseDetails = expenses.map(tx => ({
       description: tx.description || tx.items[0]?.productName || '비용',
       amount: tx.totalAmount,
-      clientName: tx.client?.name || null,
+      clientName: tx.clientId ? (clientMap.get(tx.clientId)?.name || null) : null,
     }))
 
     // 매입 상세 내역
     const purchaseDetails = purchases.map(tx => ({
       description: tx.items.map(i => i.product?.name || i.productName).filter(Boolean).join(', ') || '매입',
       amount: tx.totalAmount,
-      clientName: tx.client?.name || null,
+      clientName: tx.clientId ? (clientMap.get(tx.clientId)?.name || null) : null,
     }))
 
     // 제품별 공헌이익 배열 (정렬: 공헌이익 높은 순)
@@ -128,7 +129,6 @@ export async function GET(request: NextRequest) {
     // === 5. 당일 신규 미수금 ===
     const newReceivables = await prisma.accountsReceivable.findMany({
       where: { createdAt: { gte: dayStart, lte: dayEnd } },
-      include: { client: { select: { name: true } } },
     })
     const newARTotal = newReceivables.reduce((s, ar) => s + ar.originalAmount, 0)
 
@@ -213,7 +213,7 @@ export async function GET(request: NextRequest) {
 
       // 미수금
       newReceivables: newReceivables.map(ar => ({
-        clientName: ar.client.name, amount: ar.originalAmount,
+        clientName: clientMap.get(ar.clientId)?.name || ar.clientId, amount: ar.originalAmount,
       })),
       newARTotal,
 
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
       transactions: todayTransactions.map(t => ({
         id: t.id, type: t.type, totalAmount: t.totalAmount,
         paymentMethod: t.paymentMethod, paymentStatus: t.paymentStatus,
-        clientName: t.client?.name || '-', channel: t.channel,
+        clientName: t.clientId ? (clientMap.get(t.clientId)?.name || '-') : '-', channel: t.channel,
         description: t.description,
         items: t.items.map(i => ({ name: i.product?.name || i.productName, quantity: i.quantity, amount: i.amount })),
       })),
