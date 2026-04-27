@@ -273,7 +273,6 @@ export default function PriceChangeForm() {
 
   // ── 저장 (DB → 구글 드라이브) ────────────────────────────────
   const handleSave = async () => {
-    if (!form.recipientName) { alert('수신 정보를 입력해주세요.'); return }
     setSaving(true)
     setSavePhase('db')
     let savedId: string | null = null
@@ -285,7 +284,7 @@ export default function PriceChangeForm() {
           type: 'PRICE_CHANGE',
           title: form.title,
           recipientClientId: form.recipientClientId || null,
-          recipientName: form.recipientName,
+          recipientName: form.recipientName || '(수신자 미입력)',
           ccLine: form.ccLine,
           senderLine,
           bodyText: form.bodyText,
@@ -302,45 +301,47 @@ export default function PriceChangeForm() {
       }
       const saved = await res.json()
       savedId = saved.id
-    } catch {
-      alert('저장 실패')
+    } catch (e) {
+      console.error('DB 저장 실패:', e)
+      alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
       setSaving(false); setSavePhase('')
       return
     }
 
-    // ── 구글 드라이브 업로드 ────────────────────────────────────
+    // ── 구글 드라이브 업로드 (팝업 차단 대비 15초 타임아웃) ────
     if (ROOT_FOLDER_ID && savedId) {
       setSavePhase('drive')
       try {
-        const token = await getToken()
+        const driveToken = await Promise.race([
+          getToken(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('DRIVE_TIMEOUT')), 15000)
+          ),
+        ])
 
-        // 폴더 확보: 공문 모음
-        const folderId = await getOrCreateFolder('공문 모음', ROOT_FOLDER_ID, token)
-
-        // PDF + JPG 병렬 생성
+        const folderId = await getOrCreateFolder('공문 모음', ROOT_FOLDER_ID, driveToken)
         const [pdfBlob, jpgBlob] = await Promise.all([
           getPDFBlob('document-print-area'),
           getCanvasBlob('document-print-area', 'image/jpeg', 0.95),
         ])
-
-        // 병렬 업로드
         const [driveFileId, driveJpgId] = await Promise.all([
-          uploadToDrive(pdfBlob, `${filenameBase}.pdf`, 'application/pdf', folderId, token),
-          uploadToDrive(jpgBlob, `${filenameBase}.jpg`, 'image/jpeg', folderId, token),
+          uploadToDrive(pdfBlob, `${filenameBase}.pdf`, 'application/pdf', folderId, driveToken),
+          uploadToDrive(jpgBlob, `${filenameBase}.jpg`, 'image/jpeg', folderId, driveToken),
         ])
-
-        // DB 업데이트
         await fetch(`/api/documents/${savedId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ driveFileId, driveJpgId }),
         })
-
-
       } catch (driveErr) {
-        console.error('Drive upload failed:', driveErr)
-        // 드라이브 실패는 경고만 — DB 저장은 성공했으므로 이동 계속
-        alert(`구글 드라이브 저장 실패: ${driveErr instanceof Error ? driveErr.message : '알 수 없는 오류'}\n\n공문은 DB에 저장되었습니다.`)
+        const msg = driveErr instanceof Error ? driveErr.message : ''
+        if (msg === 'DRIVE_TIMEOUT') {
+          // 팝업 차단 또는 미인증 — DB 저장은 완료됐으므로 조용히 넘어감
+          console.warn('Drive upload skipped (no auth / popup blocked)')
+        } else {
+          console.error('Drive upload failed:', driveErr)
+          alert(`구글 드라이브 저장 실패: ${msg || '알 수 없는 오류'}\n\n공문은 DB에 저장되었습니다.`)
+        }
       }
     }
 
@@ -383,7 +384,7 @@ export default function PriceChangeForm() {
               : <Save className="w-3.5 h-3.5" />}
             {savePhase === 'db' ? 'DB 저장 중...'
               : savePhase === 'drive' ? '드라이브 저장 중...'
-              : '발행 및 저장'}
+              : '저장'}
           </Button>
         </div>
       </div>
@@ -808,7 +809,7 @@ export default function PriceChangeForm() {
                 : <Save className="w-3.5 h-3.5" />}
               {savePhase === 'db' ? 'DB 저장 중...'
                 : savePhase === 'drive' ? '드라이브 저장 중...'
-                : '발행 및 저장'}
+                : '저장'}
             </Button>
           </div>
         </div>

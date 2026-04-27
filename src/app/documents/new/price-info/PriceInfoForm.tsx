@@ -224,7 +224,6 @@ export default function PriceInfoForm() {
 
   // ── 저장 (DB → 구글 드라이브) ────────────────────────────────
   const handleSave = async () => {
-    if (!form.recipientName) { alert('수신 정보를 입력해주세요.'); return }
     setSaving(true)
     setSavePhase('db')
     let savedId: string | null = null
@@ -236,17 +235,19 @@ export default function PriceInfoForm() {
           type: 'PRICE_INFO',
           title: form.title,
           recipientClientId: form.recipientClientId || null,
-          recipientName: form.recipientName,
+          recipientName: form.recipientName || '(수신자 미입력)',
           ccLine: form.ccLine,
           senderLine,
           bodyText: form.bodyText,
           tableJson: form.rows.map(({ _productId: _, ...r }) => r),
           metaJson: {
             displayUnit: form.displayUnit,
+            optionMode: form.optionMode,
             showDiscount: form.showDiscount,
             showDealer: form.showDealer,
             showRoll: form.showRoll,
-            showBulk: form.showBulk,
+            showBulk1: form.showBulk1,
+            showBulk2: form.showBulk2,
             issueDate: form.issueDate,
             effectiveDate: form.effectiveDate,
           },
@@ -261,25 +262,31 @@ export default function PriceInfoForm() {
       }
       const saved = await res.json()
       savedId = saved.id
-    } catch {
-      alert('저장 실패')
+    } catch (e) {
+      console.error('DB 저장 실패:', e)
+      alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
       setSaving(false); setSavePhase('')
       return
     }
 
-    // ── 구글 드라이브 업로드 ────────────────────────────────────
+    // ── 구글 드라이브 업로드 (팝업 차단 대비 15초 타임아웃) ────
     if (ROOT_FOLDER_ID && savedId) {
       setSavePhase('drive')
       try {
-        const token = await getToken()
-        const folderId = await getOrCreateFolder('공문 모음', ROOT_FOLDER_ID, token)
+        const driveToken = await Promise.race([
+          getToken(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('DRIVE_TIMEOUT')), 15000)
+          ),
+        ])
+        const folderId = await getOrCreateFolder('공문 모음', ROOT_FOLDER_ID, driveToken)
         const [pdfBlob, jpgBlob] = await Promise.all([
           getPDFBlob('document-print-area'),
           getCanvasBlob('document-print-area', 'image/jpeg', 0.95),
         ])
         const [driveFileId, driveJpgId] = await Promise.all([
-          uploadToDrive(pdfBlob, `${filenameBase}.pdf`, 'application/pdf', folderId, token),
-          uploadToDrive(jpgBlob, `${filenameBase}.jpg`, 'image/jpeg', folderId, token),
+          uploadToDrive(pdfBlob, `${filenameBase}.pdf`, 'application/pdf', folderId, driveToken),
+          uploadToDrive(jpgBlob, `${filenameBase}.jpg`, 'image/jpeg', folderId, driveToken),
         ])
         await fetch(`/api/documents/${savedId}`, {
           method: 'PATCH',
@@ -287,8 +294,13 @@ export default function PriceInfoForm() {
           body: JSON.stringify({ driveFileId, driveJpgId }),
         })
       } catch (driveErr) {
-        console.error('Drive upload failed:', driveErr)
-        alert(`구글 드라이브 저장 실패: ${driveErr instanceof Error ? driveErr.message : '알 수 없는 오류'}\n\n공문은 DB에 저장되었습니다.`)
+        const msg = driveErr instanceof Error ? driveErr.message : ''
+        if (msg === 'DRIVE_TIMEOUT') {
+          console.warn('Drive upload skipped (no auth / popup blocked)')
+        } else {
+          console.error('Drive upload failed:', driveErr)
+          alert(`구글 드라이브 저장 실패: ${msg || '알 수 없는 오류'}\n\n공문은 DB에 저장되었습니다.`)
+        }
       }
     }
 
@@ -337,7 +349,7 @@ export default function PriceInfoForm() {
               : <Save className="w-3.5 h-3.5" />}
             {savePhase === 'db' ? 'DB 저장 중...'
               : savePhase === 'drive' ? '드라이브 저장 중...'
-              : '발행 및 저장'}
+              : '저장'}
           </Button>
         </div>
       </div>
@@ -580,7 +592,7 @@ export default function PriceInfoForm() {
                           </button>
                         </div>
                         <div className={`grid gap-2 ${
-                          [form.showDiscount, form.showDealer, form.showRoll, form.showBulk, form.displayUnit === 'HEBE'].filter(Boolean).length >= 3
+                          [form.showDiscount, form.showDealer, form.showRoll, form.showBulk1, form.showBulk2, form.displayUnit === 'HEBE'].filter(Boolean).length >= 3
                             ? 'grid-cols-3'
                             : 'grid-cols-2'
                         }`}>
@@ -687,7 +699,7 @@ export default function PriceInfoForm() {
                           )}
                         </div>
                         {/* 행 미리보기: 단위 변환 + 옵션 최종가 */}
-                        {(form.displayUnit !== 'YARD' || form.showDealer || form.showRoll || form.showBulk) && (
+                        {(form.displayUnit !== 'YARD' || form.showDealer || form.showRoll || form.showBulk1 || form.showBulk2) && (
                           <div className="mt-1.5 text-[11px] text-slate-500 bg-slate-50 rounded px-2 py-1 space-y-0.5">
                             {form.displayUnit !== 'YARD' && (
                               <div>표시 단가 ({form.displayUnit === 'METER' ? '미터' : '헤베'}) : <strong>{krw(cPrice)}</strong></div>
@@ -831,7 +843,7 @@ export default function PriceInfoForm() {
                 : <Save className="w-3.5 h-3.5" />}
               {savePhase === 'db' ? 'DB 저장 중...'
                 : savePhase === 'drive' ? '드라이브 저장 중...'
-                : '발행 및 저장'}
+                : '저장'}
             </Button>
           </div>
         </div>
