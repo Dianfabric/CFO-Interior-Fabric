@@ -49,11 +49,13 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
         background: '#ffffff',
         color: '#1a1a1a',
         fontFamily: '"Malgun Gothic", "맑은 고딕", -apple-system, BlinkMacSystemFont, sans-serif',
-        padding: '64px 64px 80px 64px',
+        padding: '64px 64px 0 64px',
         boxSizing: 'border-box',
         position: 'relative',
         fontSize: 13,
         lineHeight: 1.7,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* ===== 상단 헤더 ===== */}
@@ -122,8 +124,11 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
         <div style={{ marginBottom: 32 }}>{table}</div>
       ) : null}
 
+      {/* ===== 스페이서: 남은 공간을 채워 footer를 항상 하단으로 ===== */}
+      <div style={{ flex: 1 }} />
+
       {/* ===== 하단 회사정보 + 직인 ===== */}
-      <div style={{ position: 'absolute', left: 64, right: 64, bottom: 56 }}>
+      <div style={{ paddingBottom: 56 }}>
         <div style={{ borderTop: '1px solid #111', paddingTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ fontSize: 11, color: '#444', lineHeight: 1.7 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', letterSpacing: 2, marginBottom: 4 }}>
