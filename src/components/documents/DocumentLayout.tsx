@@ -49,7 +49,7 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
         background: '#ffffff',
         color: '#1a1a1a',
         fontFamily: '"Malgun Gothic", "맑은 고딕", -apple-system, BlinkMacSystemFont, sans-serif',
-        padding: '64px 64px 0 64px',
+        padding: '84px 64px 0 64px',
         boxSizing: 'border-box',
         position: 'relative',
         fontSize: 13,
@@ -75,10 +75,10 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
         </div>
       </div>
 
-      <div style={{ borderBottom: '2px solid #111', marginBottom: 28 }} />
+      <div style={{ borderBottom: '2px solid #111', marginBottom: 16 }} />
 
       {/* ===== 수신/참조/발신 ===== */}
-      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginBottom: 12 }}>
+      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginBottom: 6 }}>
         <tbody>
           <tr>
             <td style={addressCellLabel}>수　　신</td>
@@ -103,10 +103,10 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
         fontSize: 20,
         fontWeight: 700,
         letterSpacing: 6,
-        padding: '22px 0 18px 0',
+        padding: '18px 0 14px 0',
         borderTop: '1px solid #111',
         borderBottom: '1px solid #111',
-        margin: '8px 0 28px 0',
+        margin: '4px 0 22px 0',
         color: '#111',
       }}>
         {header.title || '제　목'}
@@ -128,7 +128,7 @@ export default function DocumentLayout({ header, body, bodyLineHeight = 1.9, tab
       <div style={{ flex: 1 }} />
 
       {/* ===== 하단 회사정보 + 직인 ===== */}
-      <div style={{ paddingBottom: 56 }}>
+      <div style={{ paddingBottom: 80 }}>
         <div style={{ borderTop: '1px solid #111', paddingTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ fontSize: 11, color: '#444', lineHeight: 1.7 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', letterSpacing: 2, marginBottom: 4 }}>

@@ -314,7 +314,7 @@ export default function PriceInfoTable({
       {hasDiscountRow && (
         <div style={{ marginTop: 8, fontSize: 12, color: '#1a5fa0',
           borderLeft: '3px solid #1a5fa0', paddingLeft: 10, lineHeight: 1.7 }}>
-          ※ 특별할인 금액은 선입금, 대량 주문 등의 조건에 따라 별도 적용되는 할인 금액으로,{' '}
+          ※ 특별할인 금액은 벌크 수량 충족 후 선입금 등의 특별 합의에 따라 별도 적용되는 할인 금액으로,{' '}
           {cleanRecipient ? <><strong>{cleanRecipient}</strong>님</> : '해당 거래처'}에 한하여 적용됩니다.
         </div>
       )}
