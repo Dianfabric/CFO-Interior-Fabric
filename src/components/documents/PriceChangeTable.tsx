@@ -8,21 +8,31 @@ export interface PriceRow {
   unit?: string
   note?: string
   discount?: number   // 특별할인 금액 (양수 → 최종가에서 차감)
+  vipOldPrice?: number  // VIP 거래처 기존 단가
+  vipNewPrice?: number  // VIP 거래처 인상 단가
 }
 
 interface Props {
   rows: PriceRow[]
   direction: 'UP' | 'DOWN'
   effectiveDate?: string // YYYY-MM-DD
+  vipName?: string       // VIP 거래처 이름 (헤더 부기 표시)
+  recipientName?: string // 수신 거래처 — 특별할인 안내문 "○○님" 표시
 }
 
-export default function PriceChangeTable({ rows, direction, effectiveDate }: Props) {
+export default function PriceChangeTable({ rows, direction, effectiveDate, vipName, recipientName }: Props) {
+  const cleanRecipient = (recipientName || '')
+    .replace(/\s*귀하\s*$/, '')
+    .split(/\s*\/\s*/)[0]
+    .trim()
   const isUp = direction === 'UP'
-  const labelNew = isUp ? '인상 가격' : '인하 가격'
+  const labelNew = isUp ? '인상 금액' : '인하 금액'
   const labelDelta = isUp ? '인상률' : '인하율'
 
   // 특별할인이 있는 행이 하나라도 있으면 할인 컬럼 표시
   const hasDiscount = rows.some(r => (r.discount ?? 0) > 0)
+  // VIP 가격이 있는 행이 하나라도 있으면 VIP 부기 표시
+  const hasVip = rows.some(r => (r.vipOldPrice ?? 0) > 0 || (r.vipNewPrice ?? 0) > 0)
 
   return (
     <>
@@ -35,15 +45,15 @@ export default function PriceChangeTable({ rows, direction, effectiveDate }: Pro
         <tr>
           <th style={th}>품　명</th>
           <th style={{ ...th, width: 70 }}>단위</th>
-          <th style={{ ...th, width: 100, textAlign: 'right' }}>기존 가격</th>
-          <th style={{ ...th, width: 100, textAlign: 'right' }}>{labelNew}</th>
+          <th style={{ ...th, width: 110, textAlign: 'right' }}>기존 금액</th>
+          <th style={{ ...th, width: 110, textAlign: 'right' }}>{labelNew}</th>
           {hasDiscount && (
             <th style={{ ...th, width: 100, textAlign: 'right', color: '#1a5fa0' }}>특별할인</th>
           )}
           {hasDiscount && (
             <th style={{ ...th, width: 100, textAlign: 'right', color: '#1a5fa0' }}>최종 단가</th>
           )}
-          <th style={{ ...th, width: 76, textAlign: 'right' }}>{labelDelta}</th>
+          <th style={{ ...th, width: 86, textAlign: 'right' }}>{labelDelta}</th>
         </tr>
       </thead>
       <tbody>
@@ -55,6 +65,12 @@ export default function PriceChangeTable({ rows, direction, effectiveDate }: Pro
           const disc = r.discount ?? 0
           const finalPrice = r.newPrice - disc
           const delta = r.oldPrice > 0 ? ((finalPrice - r.oldPrice) / r.oldPrice) * 100 : 0
+
+          const vipOld = r.vipOldPrice ?? 0
+          const vipNew = r.vipNewPrice ?? 0
+          const vipDelta = vipOld > 0 ? ((vipNew - vipOld) / vipOld) * 100 : 0
+          const rowHasVip = vipOld > 0 || vipNew > 0
+
           return (
             <tr key={i}>
               <td style={td}>
@@ -66,8 +82,22 @@ export default function PriceChangeTable({ rows, direction, effectiveDate }: Pro
                 )}
               </td>
               <td style={{ ...td, textAlign: 'center', color: '#666' }}>{r.unit || '-'}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#666' }}>{krw(r.oldPrice)}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isUp ? '#a01a1a' : '#0a6f3a' }}>{krw(r.newPrice)}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#666' }}>
+                <div>{krw(r.oldPrice)}</div>
+                {hasVip && vipOld > 0 && (
+                  <div style={{ fontSize: 11, color: '#7a3aa0', marginTop: 2 }}>
+                    ({krw(vipOld)})
+                  </div>
+                )}
+              </td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: isUp ? '#a01a1a' : '#0a6f3a' }}>
+                <div>{krw(r.newPrice)}</div>
+                {hasVip && vipNew > 0 && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#7a3aa0', marginTop: 2 }}>
+                    ({krw(vipNew)})
+                  </div>
+                )}
+              </td>
               {hasDiscount && (
                 <td style={{ ...td, textAlign: 'right', color: disc > 0 ? '#1a5fa0' : '#bbb', fontWeight: disc > 0 ? 600 : 400 }}>
                   {disc > 0 ? `−${krw(disc)}` : '－'}
@@ -79,7 +109,12 @@ export default function PriceChangeTable({ rows, direction, effectiveDate }: Pro
                 </td>
               )}
               <td style={{ ...td, textAlign: 'right', color: isUp ? '#a01a1a' : '#0a6f3a', fontWeight: 600 }}>
-                {delta === 0 ? '-' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}
+                <div>{delta === 0 ? '-' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}</div>
+                {hasVip && vipOld > 0 && vipNew > 0 && (
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#7a3aa0', marginTop: 2 }}>
+                    ({vipDelta > 0 ? '+' : ''}{vipDelta.toFixed(1)}%)
+                  </div>
+                )}
               </td>
             </tr>
           )
@@ -111,7 +146,22 @@ export default function PriceChangeTable({ rows, direction, effectiveDate }: Pro
         paddingLeft: 10,
         lineHeight: 1.7,
       }}>
-        ※ 특별할인 금액은 선입금, 대량 주문 등의 조건에 따라 별도 적용되는 할인 금액으로, 해당 거래처에 한하여 적용됩니다.
+        ※ 특별할인 금액은 선입금, 대량 주문 등의 조건에 따라 별도 적용되는 할인 금액으로,{' '}
+        {cleanRecipient ? <><strong>{cleanRecipient}</strong>님</> : '해당 거래처'}에 한하여 적용됩니다.
+      </div>
+    )}
+
+    {/* VIP 가격 안내 — VIP 적용 행이 있을 때만 표시 */}
+    {hasVip && (
+      <div style={{
+        marginTop: 8,
+        fontSize: 12,
+        color: '#7a3aa0',
+        borderLeft: '3px solid #7a3aa0',
+        paddingLeft: 10,
+        lineHeight: 1.7,
+      }}>
+        ※ 괄호 안의 단가는 {vipName ? <><strong>{vipName}</strong>님</> : '귀사'}에 한하여 적용되는 특별 단가입니다.
       </div>
     )}
   </>

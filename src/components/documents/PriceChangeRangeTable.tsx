@@ -6,9 +6,10 @@ interface Props {
   unit: 'PERCENT' | 'AMOUNT'
   direction: 'UP' | 'DOWN'
   effectiveDate?: string
+  note?: string  // 비고 — 빈 값이면 '－'로 표시
 }
 
-export default function PriceChangeRangeTable({ min, max, unit, direction, effectiveDate }: Props) {
+export default function PriceChangeRangeTable({ min, max, unit, direction, effectiveDate, note }: Props) {
   const isUp = direction === 'UP'
   const fmt = (v: number) =>
     unit === 'PERCENT'
@@ -33,7 +34,9 @@ export default function PriceChangeRangeTable({ min, max, unit, direction, effec
             <td style={{ ...td, textAlign: 'center', fontWeight: 700, fontSize: 14, color: isUp ? '#a01a1a' : '#0a6f3a' }}>
               {rangeText}
             </td>
-            <td style={{ ...td, textAlign: 'center', color: '#888' }}>－</td>
+            <td style={{ ...td, textAlign: 'center', color: note?.trim() ? '#222' : '#888', whiteSpace: 'pre-wrap' }}>
+              {note?.trim() || '－'}
+            </td>
           </tr>
         </tbody>
       </table>
